@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruleta Mágica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=MedievalSharp&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'MedievalSharp', cursive;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        }
+        .title-font {
+            font-family: 'Cinzel Decorative', cursive;
+        }
+        .roulette-wheel-container {
+            position: relative;
+            width: 350px;
+            height: 350px;
+            filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.5));
+        }
+        canvas {
+            transition: transform 6s cubic-bezier(0.3, 0, 0.1, 1);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #fde047; /* yellow-300 */
+            filter: drop-shadow(0 0 10px #fde047);
+            z-index: 10;
+        }
+        .bet-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 4px;
+        }
+        .bet-number, .bet-zero-btn {
+            aspect-ratio: 1 / 1;
+        }
+        .bet-zero-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
+        .bet-zero-btn {
+            width: 25%; /* Más pequeño */
+        }
+        .bet-option {
+            transition: all 0.3s ease;
+            border: 2px solid #4a2b0f;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+        .bet-option:hover {
+            transform: translateY(-2px);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 0 15px #fde047;
+        }
+        .bet-option.selected {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 0 20px #facc15, inset 0 0 10px #facc15;
+            border-color: #fde047;
+        }
+        /* Estilo para los números resaltados */
+        .bet-number.highlighted {
+            box-shadow: 0 0 15px #fde047, inset 0 0 5px #fde047;
+            border-color: #fde047;
+            transform: scale(1.05);
+            z-index: 5;
+        }
+        .message-box {
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        .magic-bg {
+            background-color: #1e1b4b; /* indigo-950 */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23fde047' fill-opacity='0.1'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+    </style>
+</head>
+<body class="text-yellow-200 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl mx-auto bg-indigo-900/70 rounded-2xl shadow-2xl shadow-yellow-400/20 p-4 md:p-8 border-2 border-yellow-400/50">
+        <h1 class="text-4xl md:text-6xl font-bold text-center mb-8 text-yellow-300 title-font">Ruleta Mágica</h1>
+
+        <div class="flex flex-col lg:flex-row items-center lg:items-start gap-8">
+
+            <div class="flex flex-col items-center gap-6">
+                <div class="roulette-wheel-container">
+                    <div class="pointer"></div>
+                    <canvas id="roulette-wheel" width="350" height="350"></canvas>
+                </div>
+                <div id="result-display" class="text-3xl font-bold h-10 title-font"></div>
+            </div>
+
+            <div class="w-full flex-1">
+                <div class="magic-bg p-6 rounded-lg border border-yellow-600/50">
+                    <h2 class="text-3xl mb-4 text-yellow-200 title-font">Elige tu Destino</h2>
+
+                    <div class="flex flex-col sm:flex-row items-center gap-4 mb-6">
+                        <div class="w-full sm:w-auto">
+                            <label for="bet-amount" class="sr-only">Cantidad a apostar</label>
+                            <input type="number" id="bet-amount" min="1" placeholder="Ofrenda..." class="w-full bg-indigo-950/70 border-2 border-yellow-700/50 rounded-lg px-4 py-2 text-lg text-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent">
+                        </div>
+                        <button id="spin-button" class="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-400 text-indigo-900 font-bold text-lg px-8 py-2 rounded-lg shadow-lg shadow-yellow-500/30 transition-all transform hover:scale-105">
+                            CONJURAR
+                        </button>
+                    </div>
+
+                    <div>
+                        <div class="bet-zero-container">
+                            <button id="bet-zero" class="bet-zero-btn bet-option bg-teal-600 hover:bg-teal-500 rounded-md flex items-center justify-center text-xl font-bold" data-bet-type="number" data-bet-value="0">0</button>
+                        </div>
+                        <div class="bet-grid mb-4">
+                            <!-- Generado por JS -->
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <button class="bet-option bg-rose-800 hover:bg-rose-700 p-3 rounded-lg font-bold text-lg" data-bet-type="color" data-bet-value="red">ROJO</button>
+                            <button class="bet-option bg-slate-800 hover:bg-slate-700 p-3 rounded-lg font-bold text-lg" data-bet-type="color" data-bet-value="black">NEGRO</button>
+                            <button class="bet-option bg-sky-800 hover:bg-sky-700 p-3 rounded-lg font-bold text-lg" data-bet-type="parity" data-bet-value="even">PAR</button>
+                            <button class="bet-option bg-purple-800 hover:bg-purple-700 p-3 rounded-lg font-bold text-lg" data-bet-type="parity" data-bet-value="odd">IMPAR</button>
+                        </div>
+                           <div class="grid grid-cols-2 gap-4 mb-4">
+                               <button class="bet-option bg-amber-700/80 hover:bg-amber-600/80 p-3 rounded-lg font-bold text-base" data-bet-type="half" data-bet-value="1">1-18</button>
+                               <button class="bet-option bg-amber-700/80 hover:bg-amber-600/80 p-3 rounded-lg font-bold text-base" data-bet-type="half" data-bet-value="2">19-36</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                               <button class="bet-option bg-cyan-800/80 hover:bg-cyan-700/80 p-3 rounded-lg font-bold text-base" data-bet-type="dozen" data-bet-value="1">1-12</button>
+                               <button class="bet-option bg-cyan-800/80 hover:bg-cyan-700/80 p-3 rounded-lg font-bold text-base" data-bet-type="dozen" data-bet-value="2">13-24</button>
+                               <button class="bet-option bg-cyan-800/80 hover:bg-cyan-700/80 p-3 rounded-lg font-bold text-base" data-bet-type="dozen" data-bet-value="3">25-36</button>
+                        </div>
+                    </div>
+                </div>
+                   <div id="current-bet-display" class="mt-4 text-center text-lg h-6">Selecciona un presagio...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden opacity-0 -translate-y-10 message-box">
+        <div class="magic-bg rounded-2xl p-8 text-center shadow-2xl shadow-yellow-400/30 border-4 border-yellow-400/80">
+            <p id="message-text" class="text-3xl font-bold mb-6 text-yellow-200"></p>
+            <button id="close-message-button" class="bg-yellow-500 hover:bg-yellow-400 text-indigo-900 font-bold px-8 py-3 rounded-lg shadow-lg shadow-yellow-500/30 transition-transform transform hover:scale-105">Probar suerte de nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('roulette-wheel');
+            const ctx = canvas.getContext('2d');
+            const spinButton = document.getElementById('spin-button');
+            const betAmountInput = document.getElementById('bet-amount');
+            const resultDisplay = document.getElementById('result-display');
+            const currentBetDisplay = document.getElementById('current-bet-display');
+            const betGrid = document.querySelector('.bet-grid');
+            
+            const messageModal = document.getElementById('message-modal');
+            const messageText = document.getElementById('message-text');
+            const closeMessageButton = document.getElementById('close-message-button');
+
+            // Define los números de la ruleta en orden (empezando por 0 y siguiendo el sentido horario desde la derecha)
+            const numbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+            // Define los colores de los números
+            const colors = {
+                red: [32, 19, 21, 25, 34, 27, 36, 30, 23, 5, 16, 1, 14, 9, 18, 7, 12, 3],
+                black: [15, 4, 2, 17, 6, 13, 11, 8, 10, 24, 33, 20, 31, 22, 29, 28, 35, 26],
+                green: [0]
+            };
+            const numSegments = numbers.length;
+            const anglePerSegment = (2 * Math.PI) / numSegments; // Ángulo de cada segmento
+            const radius = canvas.width / 2; // Radio de la ruleta
+
+            let currentBet = null; // Almacena la apuesta actual del jugador
+            let isSpinning = false; // Bandera para controlar si la ruleta está girando
+            let numberButtonElements = {}; // Almacena los elementos de los botones de número para resaltado
+
+            // Función para obtener el color de un número
+            function getNumberColor(num) {
+                if (colors.red.includes(num)) return 'red';
+                if (colors.black.includes(num)) return 'black';
+                return 'green';
+            }
+            
+            // Función para quitar el resaltado de todos los botones de número
+            function clearHighlights() {
+                Object.values(numberButtonElements).forEach(btn => {
+                    btn.classList.remove('highlighted');
+                });
+            }
+
+            // Función para resaltar los números relevantes según la apuesta seleccionada
+            function highlightNumbers(numbersToHighlight) {
+                clearHighlights();
+                numbersToHighlight.forEach(num => {
+                    if (numberButtonElements[num]) {
+                        numberButtonElements[num].classList.add('highlighted');
+                    }
+                });
+            }
+
+            // Función para generar la cuadrícula de apuestas numéricas
+            function generateBettingGrid() {
+                   for (let i = 1; i <= 36; i++) {
+                    const numberButton = document.createElement('button');
+                    const color = getNumberColor(i);
+                    numberButton.textContent = i;
+                    // Añade clases de Tailwind y clases personalizadas para estilo
+                    numberButton.classList.add('bet-number', 'bet-option', 'flex', 'items-center', 'justify-center', 'font-bold', 'rounded-md', 'text-lg', 'relative');
+                    if (color === 'red') {
+                        numberButton.classList.add('bg-rose-800', 'hover:bg-rose-700');
+                    } else {
+                        numberButton.classList.add('bg-slate-800', 'hover:bg-slate-700');
+                    }
+                    numberButton.dataset.betType = 'number';
+                    numberButton.dataset.betValue = i;
+                    betGrid.appendChild(numberButton);
+                    numberButtonElements[i] = numberButton; // Guarda la referencia al botón
+                }
+                // Añade el event listener a todos los botones de apuesta
+                document.querySelectorAll('.bet-option').forEach(addBetListener);
+            }
+            
+            // Función para manejar la selección de una apuesta
+            function addBetListener(button) {
+                button.addEventListener('click', () => {
+                    if (isSpinning) return; // No permitir apuestas mientras gira
+                    
+                    // Quita la selección de todos los botones y selecciona el actual
+                    document.querySelectorAll('.bet-option').forEach(btn => btn.classList.remove('selected'));
+                    button.classList.add('selected');
+
+                    // Almacena la apuesta seleccionada
+                    currentBet = {
+                        type: button.dataset.betType,
+                        value: button.dataset.betValue
+                    };
+                    
+                    // Actualiza el texto de la apuesta actual en la interfaz
+                    let betText = `Presagio: Número ${currentBet.value}`;
+                    if (currentBet.type === 'color') betText = `Presagio: Color ${currentBet.value === 'red' ? 'Rojo' : 'Negro'}`;
+                    if (currentBet.type === 'parity') betText = `Presagio: ${currentBet.value === 'even' ? 'Par' : 'Impar'}`;
+                    if (currentBet.type === 'half') betText = `Presagio: Mitad ${currentBet.value === '1' ? '1-18' : '19-36'}`;
+                    if (currentBet.type === 'dozen') betText = `Presagio: Tercio ${currentBet.value}`;
+                    currentBetDisplay.textContent = betText;
+
+                    // Lógica para resaltar los números en la cuadrícula de apuestas
+                    let numbersToHighlight = [];
+                    switch (currentBet.type) {
+                        case 'number':
+                            numbersToHighlight.push(parseInt(currentBet.value));
+                            break;
+                        case 'color':
+                            for(let i = 1; i <= 36; i++) {
+                                if (getNumberColor(i) === currentBet.value) numbersToHighlight.push(i);
+                            }
+                            break;
+                        case 'parity':
+                            const isEven = currentBet.value === 'even';
+                            for(let i = 1; i <= 36; i++) {
+                                if ((i % 2 === 0) === isEven) numbersToHighlight.push(i);
+                            }
+                            break;
+                        case 'half':
+                            const startHalf = currentBet.value === '1' ? 1 : 19;
+                            const endHalf = currentBet.value === '1' ? 18 : 36;
+                            for (let i = startHalf; i <= endHalf; i++) numbersToHighlight.push(i);
+                            break;
+                        case 'dozen':
+                            const dozen = parseInt(currentBet.value);
+                            const startDozen = (dozen - 1) * 12 + 1;
+                            const endDozen = dozen * 12;
+                            for (let i = startDozen; i <= endDozen; i++) numbersToHighlight.push(i);
+                            break;
+                        default:
+                            clearHighlights(); // Limpia cualquier resaltado si no es una apuesta específica
+                            break;
+                    }
+                    highlightNumbers(numbersToHighlight);
+                });
+            }
+
+            // Función para dibujar la ruleta en el canvas
+            function drawRouletteWheel() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.translate(radius, radius); // Mueve el origen al centro del canvas
+
+                // Dibuja cada segmento de la ruleta
+                numbers.forEach((number, i) => {
+                    const angle = i * anglePerSegment; // Ángulo del centro del segmento
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    // Dibuja el arco para el segmento
+                    ctx.arc(0, 0, radius - 5, angle - anglePerSegment / 2, angle + anglePerSegment / 2);
+                    ctx.closePath();
+
+                    // Asigna colores a los segmentos
+                    let color;
+                    if (number === 0) {
+                        color = '#0d9488'; // verde para el 0
+                    } else if (colors.red.includes(number)) {
+                        color = '#be123c'; // rojo
+                    } else {
+                        color = '#1e293b'; // negro
+                    }
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#ca8a04'; // Borde amarillo
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Dibuja el número en el segmento
+                    ctx.save();
+                    ctx.rotate(angle); // Rota para alinear el texto con el segmento
+                    ctx.fillStyle = '#fde047'; // Color del texto
+                    ctx.font = 'bold 16px MedievalSharp';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(number, radius - 25, 0); // Posiciona el texto
+                    ctx.restore();
+                });
+                ctx.restore();
+
+                // Dibuja el centro de la ruleta
+                ctx.beginPath();
+                ctx.arc(radius, radius, 30, 0, 2 * Math.PI);
+                ctx.fillStyle = '#4338ca'; // indigo-700
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(radius, radius, 20, 0, 2 * Math.PI);
+                ctx.fillStyle = '#fde047';
+                ctx.fill();
+            }
+            
+            // Función para mostrar el modal de mensajes
+            function showMessage(message) {
+                messageText.innerHTML = message;
+                messageModal.classList.remove('hidden');
+                setTimeout(() => {
+                    messageModal.classList.remove('opacity-0', '-translate-y-10');
+                }, 10);
+            }
+
+            // Función para ocultar el modal de mensajes
+            function hideMessage() {
+                messageModal.classList.add('opacity-0', '-translate-y-10');
+                setTimeout(() => {
+                    messageModal.classList.add('hidden');
+                }, 500);
+            }
+            
+            // Event listener para cerrar el modal de mensajes
+            closeMessageButton.addEventListener('click', hideMessage);
+
+            // Función principal para girar la ruleta
+            function spin() {
+                if (isSpinning) return; // Evita giros múltiples
+                if (!currentBet) {
+                    showMessage('Debes seleccionar un presagio primero.'); // Usa el modal personalizado
+                    return;
+                }
+                const betAmount = parseInt(betAmountInput.value);
+                if (isNaN(betAmount) || betAmount <= 0) {
+                    showMessage('Debes realizar una ofrenda válida.'); // Usa el modal personalizado
+                    return;
+                }
+
+                isSpinning = true;
+                spinButton.disabled = true;
+                spinButton.classList.add('opacity-50', 'cursor-not-allowed');
+                resultDisplay.textContent = 'El destino gira...';
+
+                // Selecciona un índice aleatorio que será el número ganador real
+                const actualWinningIndex = Math.floor(Math.random() * numSegments); 
+                // Calcula el ángulo inicial de este segmento en la ruleta
+                const angleOfActualWinningSegment = actualWinningIndex * anglePerSegment;
+
+                // El puntero está en la parte superior (12 en punto). En coordenadas de canvas (clockwise desde la derecha), esto es 270 grados o 1.5 * Math.PI radianes.
+                const pointerAngleInRadians = 1.5 * Math.PI; 
+
+                // Calcula la rotación necesaria para que el centro del segmento elegido se alinee con el puntero
+                let rotationToAlign = pointerAngleInRadians - angleOfActualWinningSegment;
+
+                // Asegura que la rotación sea positiva (en sentido horario) y dentro de una vuelta completa para la alineación inicial
+                while (rotationToAlign < 0) {
+                    rotationToAlign += 2 * Math.PI;
+                }
+
+                // Añade múltiples giros completos para el efecto visual de la ruleta
+                const randomSpins = Math.floor(Math.random() * 5) + 8;
+                // Añade un pequeño desfase aleatorio para que no siempre caiga en el centro exacto del segmento
+                const randomOffset = (Math.random() - 0.5) * anglePerSegment * 0.8; 
+                const totalRotation = (randomSpins * 2 * Math.PI) + rotationToAlign + randomOffset;
+                
+                // Aplica la rotación a la ruleta con una transición suave
+                canvas.style.transition = 'transform 6s cubic-bezier(0.3, 0, 0.1, 1)';
+                canvas.style.transform = `rotate(${totalRotation}rad)`;
+                
+                // Después de que la animación termina
+                setTimeout(() => {
+                    isSpinning = false;
+                    spinButton.disabled = false;
+                    spinButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                    
+                    const winningNumber = numbers[actualWinningIndex];
+                    resultDisplay.innerHTML = `Fortuna: <span class="text-yellow-300">${winningNumber}</span>`;
+
+                    checkWin(winningNumber, betAmount);
+                    
+                    // --- INICIO DE LA CORRECCIÓN PARA GIROS FLUIDOS ---
+                    // Calcula la rotación final real de la ruleta (normalizada entre 0 y 2*PI)
+                    const finalVisualRotation = totalRotation % (2 * Math.PI);
+                    
+                    // Deshabilita temporalmente la transición para evitar un "salto" visual
+                    canvas.style.transition = 'none';
+                    // Establece el transform al ángulo normalizado.
+                    // Esto "reinicia" el valor interno de CSS sin cambiar la posición visual de la ruleta,
+                    // preparando el siguiente giro para que comience limpiamente desde un ángulo pequeño.
+                    canvas.style.transform = `rotate(${finalVisualRotation}rad)`;
+                    
+                    // La transición se volverá a aplicar al inicio de la siguiente llamada a spin().
+                    // --- FIN DE LA CORRECCIÓN ---
+
+                    currentBet = null;
+                    document.querySelectorAll('.bet-option').forEach(btn => btn.classList.remove('selected'));
+                    currentBetDisplay.textContent = 'Selecciona un presagio...';
+                    clearHighlights();
+                    
+                }, 6000);
+            }
+            
+            // Función para comprobar si el jugador ganó y mostrar el resultado
+            function checkWin(winningNumber, betAmount) {
+                let hasWon = false;
+                let payoutMultiplier = 0;
+                const { type, value } = currentBet;
+
+                // Lógica de comprobación de ganancias para diferentes tipos de apuestas
+                if (winningNumber === 0) {
+                   if (type === 'number' && parseInt(value) === 0) {
+                        hasWon = true;
+                        payoutMultiplier = 35; // Pago por número exacto
+                    }
+                } else if (type === 'number') {
+                    if (parseInt(value) === winningNumber) {
+                        hasWon = true;
+                        payoutMultiplier = 35; // Pago por número exacto
+                    }
+                } else if (type === 'color') {
+                    if (value === getNumberColor(winningNumber)) hasWon = true, payoutMultiplier = 1; // Pago 1:1 para color
+                } else if (type === 'parity') {
+                    const isEven = winningNumber % 2 === 0;
+                    if ((value === 'even' && isEven) || (value === 'odd' && !isEven)) hasWon = true, payoutMultiplier = 1; // Pago 1:1 para par/impar
+                } else if (type === 'half') {
+                    // Asegura que el 0 no se incluya en las mitades
+                    if ((value === '1' && winningNumber >= 1 && winningNumber <= 18) || (value === '2' && winningNumber >= 19 && winningNumber <= 36)) hasWon = true, payoutMultiplier = 1; // Pago 1:1 para mitades
+                } else if (type === 'dozen') {
+                    // Asegura que el 0 no se incluya en las docenas
+                    if ((value === '1' && winningNumber >= 1 && winningNumber <= 12) || (value === '2' && winningNumber >= 13 && winningNumber <= 24) || (value === '3' && winningNumber >= 25 && winningNumber <= 36)) hasWon = true, payoutMultiplier = 2; // Pago 2:1 para docenas
+                }
+
+                // Muestra el mensaje de victoria o derrota
+                if (hasWon) {
+                    const winnings = betAmount + (betAmount * payoutMultiplier);
+                    showMessage(`¡LOS ASTROS TE FAVORECEN!<br><span class="text-green-400 text-5xl">+${winnings}</span>`);
+                } else {
+                    showMessage(`LA FORTUNA TE ESQUIVA<br><span class="text-red-500 text-5xl">-${betAmount}</span>`);
+                }
+            }
+
+            // Asigna el event listener al botón de girar
+            spinButton.addEventListener('click', spin);
+            
+            // Inicializa la cuadrícula de apuestas y dibuja la ruleta al cargar la página
+            generateBettingGrid();
+            drawRouletteWheel();
+        });
+    </script>
+</body>
+</html>
